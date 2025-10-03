@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q&A CSV Generator - Relvet</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- App Shell & Variables --- */
+        :root {
+            --primary-color: #f59e0b; --primary-hover: #fbbf24; --danger-color: #ef4444;
+            --danger-hover: #f87171; --bg-color: #f8f9fa; --content-bg: #ffffff;
+            --sidebar-bg: #111827; --text-color: #111827; --text-secondary: #4b5563;
+            --border-color: #e5e7eb; --shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --sidebar-width: 260px; --topbar-height: 60px; --border-radius: 12px;
+        }
+        body.dark-mode {
+            --bg-color: #121212; --content-bg: #1e1e1e; --sidebar-bg: #1e1e1e;
+            --text-color: #e5e5e5; --text-secondary: #888888; --border-color: #2e2e2e;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; overflow-x: hidden; display: flex; flex-direction: column; }
+        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background-color: var(--sidebar-bg); color: #e5e5e5; padding: 20px; display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s ease-in-out; z-index: 1000; }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .sidebar-logo { font-size: 1.5rem; font-weight: 600; }
+        #close-sidebar-btn { background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
+        #close-sidebar-btn:hover { color: white; }
+        .sidebar-nav ul { list-style: none; }
+        .sidebar-nav li a { display: block; color: #d1d5db; text-decoration: none; padding: 15px; border-radius: 8px; font-weight: 500; transition: background-color 0.2s, color 0.2s; cursor: pointer; }
+        .sidebar-nav li a:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .main-content { padding-top: var(--topbar-height); transition: margin-left 0.3s ease-in-out; flex-grow: 1; display: flex; flex-direction: column; }
+        body.sidebar-active .main-content { margin-left: var(--sidebar-width); }
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-height); background-color: var(--content-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 20px; z-index: 900; transition: background-color 0.3s, border-color 0.3s; box-shadow: var(--shadow); }
+        #menu-btn { background: none; border: none; cursor: pointer; padding: 5px; z-index: 2; }
+        #menu-btn svg { width: 24px; height: 24px; stroke: var(--text-color); }
+        .app-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 600; color: var(--text-color); }
+        .app-title svg { width: 28px; height: 28px; color: var(--primary-color); }
+        .page-container { padding: 30px; flex-grow: 1; }
+        h1 { font-size: 2.5rem; margin-bottom: 30px; }
+        .donate-footer { padding: 25px; text-align: center; background-color: var(--content-bg); border-top: 1px solid var(--border-color); transition: background-color 0.3s, border-color 0.3s; }
+        .donate-footer p { color: var(--text-secondary); }
+        .btn { display: inline-block; padding: 10px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: transform 0.2s ease, background-color 0.2s ease; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .overlay.active { opacity: 1; visibility: visible; }
+        
+        /* --- Tool Specific CSS --- */
+        #tool-workspace, #prompt-page-content { background-color: var(--content-bg); padding: 30px; border-radius: var(--border-radius); box-shadow: var(--shadow); }
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 25px; }
+        .tab-link { padding: 10px 20px; cursor: pointer; border: none; background-color: transparent; font-size: 1rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+        .tab-link.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        textarea.tool-input { width: 100%; padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); min-height: 250px; resize: vertical; font-family: 'Poppins', sans-serif; }
+        .tool-button-container { margin-top: 20px; display: flex; justify-content: flex-end; gap: 15px; }
+        .qa-block { display: flex; gap: 15px; align-items: flex-start; margin-bottom: 15px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; }
+        .qa-block-inputs { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; }
+        .qa-block textarea { min-height: 50px; }
+        .remove-btn { background-color: var(--danger-color); padding: 8px 10px; font-size: 0.9rem; flex-shrink: 0; }
+        .remove-btn:hover { background-color: var(--danger-hover); }
+        .add-btn { background-color: #3b82f6; }
+        .add-btn:hover { background-color: #60a5fa; }
+        p { margin-bottom: 15px; line-height: 1.6; }
+        ol { margin-left: 20px; margin-bottom: 20px; }
+        ol li { margin-bottom: 8px; }
+        .prompt-box { background-color: var(--bg-color); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; }
+        
+        .page-view { display: none; }
+        .page-view.active { display: block; }
+    </style>
+</head>
+<body class="light-mode">
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header"><span class="sidebar-logo">Relvet Menu</span><button id="close-sidebar-btn">&times;</button></div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a id="back-to-generator-link">Q&A Generator</a></li>
+                <li><a id="prompt-link">AI Prompt Helper</a></li>
+                <li><a href="index.html">Back to All Tools</a></li>
+                <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Rate Us</a></li>
+                <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Donate</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <div class="main-content" id="main-content">
+        <header class="top-bar">
+            <button id="menu-btn"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg></button>
+            <div class="app-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.75h16.5m-16.5 4.5h16.5m-16.5-8.25h16.5V21a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 21V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v1.5" /></svg><span id="page-title">Q&A CSV Generator</span></div>
+        </header>
+
+        <main class="page-container" id="page-container">
+            <div id="generator-page" class="page-view active">
+                <h1>Generate CSV from Q&A</h1>
+                <div id="tool-workspace">
+                    <div class="tabs"><button class="tab-link active" data-tab="markdown-tab">Markdown Input</button><button class="tab-link" data-tab="blocks-tab">Structured Blocks</button></div>
+                    <div id="markdown-tab" class="tab-content active">
+                        <label for="markdown-input" style="display:block; margin-bottom:10px; font-weight:500;">Paste your text below. Use the "AI Prompt Helper" in the menu to generate content.</label>
+                        <textarea id="markdown-input" class="tool-input" placeholder="Example:&#10;Q=What is the capital of France? A=Paris"></textarea>
+                        <div class="tool-button-container"><button id="generate-from-text-btn" class="btn">Generate CSV from Text</button></div>
+                    </div>
+                    <div id="blocks-tab" class="tab-content">
+                        <div id="qa-blocks-container"></div>
+                        <div class="tool-button-container"><button id="add-qa-block-btn" class="btn add-btn">Add Question</button><button id="generate-from-blocks-btn" class="btn">Generate CSV from Blocks</button></div>
+                    </div>
+                </div>
+            </div>
+            <div id="prompt-page" class="page-view">
+                <h1>AI Prompt Helper</h1>
+                <div id="prompt-page-content">
+                    <p>This powerful prompt helps you convert your notes, textbook paragraphs, or any information into the required Q&A format using an AI chatbot.</p>
+                    <h4>How to Use:</h4>
+                    <ol>
+                        <li>Click "Copy Prompt" and paste it into an AI like ChatGPT or Google Gemini.</li>
+                        <li><strong>To use your own text:</strong> Replace the placeholder `[PASTE YOUR FULL TEXT HERE...]` with your paragraph or notes.</li>
+                        <li><strong>To use a general topic:</strong> Delete the placeholder text and just type a topic like `Topic: The laws of thermodynamics`.</li>
+                        <li>Copy the AI's response back into this tool's "Markdown Input" tab.</li>
+                    </ol>
+                    <div class="prompt-box" id="prompt-text">
+Your task is to generate a list of question-and-answer pairs based on the context I provide below.
+
+CRITICAL INSTRUCTIONS:
+1.  You MUST use the exact format: `Q=The question text A=The answer text`
+2.  Each Q&A pair must be on a new, single line.
+3.  Do NOT use any numbers, bullet points, or other formatting before or after each line.
+4.  If I provide a block of text, you MUST base the questions and answers STRICTLY on the information within that text only. Do not use external knowledge.
+5.  Generate at least 10 pairs, or as many as are relevant from the text.
+
+--- START OF CONTEXT ---
+
+[PASTE YOUR FULL TEXT HERE. For example, paste a paragraph from your MBBS textbook about the Krebs cycle, a section from your B.Tech notes on data structures, or any other organized/unorganized information.]
+
+--- END OF CONTEXT ---
+                    </div>
+                    <div class="tool-button-container"><button class="btn" id="copy-prompt-btn">Copy Prompt</button></div>
+                </div>
+            </div>
+        </main>
+        <footer class="donate-footer"><p>&copy; 2023 Relvet Tools. All rights reserved.</p></footer>
+    </div>
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+        // --- APP SHELL SCRIPT ---
+        const body = document.body;
+        const sidebar = document.getElementById('sidebar');
+        const menuBtn = document.getElementById('menu-btn');
+        const closeBtn = document.getElementById('close-sidebar-btn');
+        const overlay = document.getElementById('overlay');
+        const openSidebar = () => { sidebar.classList.add('active'); overlay.classList.add('active'); body.classList.add('sidebar-active'); };
+        const closeSidebar = () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); body.classList.remove('sidebar-active'); };
+        menuBtn.addEventListener('click', openSidebar);
+        closeBtn.addEventListener('click', closeSidebar);
+        overlay.addEventListener('click', closeSidebar);
+
+        // --- TOOL JAVASCRIPT LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const generatorPage = document.getElementById('generator-page');
+            const promptPage = document.getElementById('prompt-page');
+            const pageTitle = document.getElementById('page-title');
+            const promptLink = document.getElementById('prompt-link');
+            const generatorLink = document.getElementById('back-to-generator-link');
+
+            const showPage = (pageId) => {
+                generatorPage.classList.toggle('active', pageId === 'generator');
+                promptPage.classList.toggle('active', pageId === 'prompt');
+                pageTitle.textContent = pageId === 'generator' ? 'Q&A CSV Generator' : 'AI Prompt Helper';
+                closeSidebar();
+            };
+            promptLink.addEventListener('click', (e) => { e.preventDefault(); showPage('prompt'); });
+            generatorLink.addEventListener('click', (e) => { e.preventDefault(); showPage('generator'); });
+
+            // --- 100% BULLETPROOF COPY FUNCTIONALITY ---
+            const copyPromptBtn = document.getElementById('copy-prompt-btn');
+            const promptTextEl = document.getElementById('prompt-text');
+            copyPromptBtn.addEventListener('click', async () => {
+                const textToCopy = promptTextEl.innerText;
+                let success = false;
+
+                try {
+                    // STAGE 1: Modern Async Clipboard API (Best for HTTPS)
+                    if (!navigator.clipboard) throw new Error('Clipboard API not supported');
+                    await navigator.clipboard.writeText(textToCopy);
+                    success = true;
+                } catch (err) {
+                    // STAGE 2: Legacy `execCommand` Fallback (Best for file:// and older browsers)
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    textArea.style.position = 'fixed';
+                    textArea.style.top = '-9999px';
+                    textArea.style.left = '-9999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        success = document.execCommand('copy');
+                    } catch (e) {
+                        console.error("Legacy copy command failed", e);
+                    }
+                    document.body.removeChild(textArea);
+                }
+
+                // --- UI FEEDBACK ---
+                if (success) {
+                    copyPromptBtn.textContent = 'Copied!';
+                } else {
+                    // STAGE 3: "CANNOT FAIL" Manual Fallback
+                    try {
+                        const range = document.createRange();
+                        range.selectNodeContents(promptTextEl);
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        alert('Automatic copy failed. The prompt text has been selected for you. Please press Ctrl+C (or Command+C on Mac) to copy.');
+                    } catch(e) {
+                         alert("Automatic copy failed. Please select and copy the text manually.");
+                    }
+                }
+
+                // Reset button text after a delay
+                setTimeout(() => { copyPromptBtn.textContent = 'Copy Prompt'; }, 2500);
+            });
+            
+            // --- ALL OTHER TOOL LOGIC (VERIFIED & UNCHANGED) ---
+            const generateAndDownloadCSV = (dataArray) => {
+                if (dataArray.length === 0) { alert("No data to export."); return; }
+                const headers = ['Question', 'Answer'];
+                const formatCsvCell = (cellData) => {
+                    const data = String(cellData || "").trim();
+                    if (data.includes('"') || data.includes(',') || data.includes('\n')) { return `"${data.replace(/"/g, '""')}"`; }
+                    return data;
+                };
+                const rows = dataArray.map(item => [formatCsvCell(item.question), formatCsvCell(item.answer)]);
+                let csvContent = headers.join(',') + '\n';
+                rows.forEach(row => { csvContent += row.join(',') + '\n'; });
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const date = new Date().toISOString().slice(0, 10);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `qa_export_${date}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+            const tabLinks = document.querySelectorAll('.tab-link');
+            tabLinks.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTabId = tab.dataset.tab;
+                    document.querySelectorAll('.tab-link').forEach(link => link.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(targetTabId).classList.add('active');
+                });
+            });
+            const markdownInput = document.getElementById('markdown-input');
+            const generateFromTextBtn = document.getElementById('generate-from-text-btn');
+            generateFromTextBtn.addEventListener('click', () => {
+                const lines = markdownInput.value.split('\n');
+                const data = [];
+                const qaRegex = /Q=(.*?)\s*A=(.*)/i;
+                lines.forEach(line => {
+                    const match = line.match(qaRegex);
+                    if (match && (match[1]?.trim() || match[2]?.trim())) { data.push({ question: match[1]?.trim(), answer: match[2]?.trim() }); }
+                });
+                generateAndDownloadCSV(data);
+            });
+            const blocksContainer = document.getElementById('qa-blocks-container');
+            const addBlockBtn = document.getElementById('add-qa-block-btn');
+            const generateFromBlocksBtn = document.getElementById('generate-from-blocks-btn');
+            const createNewBlock = () => {
+                const blockCount = blocksContainer.children.length + 1;
+                const block = document.createElement('div');
+                block.className = 'qa-block';
+                block.innerHTML = `<div class="qa-block-inputs"><textarea class="tool-input question-input" placeholder="Question ${blockCount}"></textarea><textarea class="tool-input answer-input" placeholder="Answer ${blockCount}"></textarea></div><button class="btn remove-btn">Remove</button>`;
+                blocksContainer.appendChild(block);
+            };
+            createNewBlock();
+            addBlockBtn.addEventListener('click', createNewBlock);
+            blocksContainer.addEventListener('click', (e) => { if (e.target && e.target.classList.contains('remove-btn')) { e.target.closest('.qa-block').remove(); } });
+            generateFromBlocksBtn.addEventListener('click', () => {
+                const data = [];
+                blocksContainer.querySelectorAll('.qa-block').forEach(block => {
+                    const question = block.querySelector('.question-input').value.trim();
+                    const answer = block.querySelector('.answer-input').value.trim();
+                    if (question || answer) { data.push({ question, answer }); }
+                });
+                generateAndDownloadCSV(data);
+            });
+        });
+    </script>
+</body>
+</html>

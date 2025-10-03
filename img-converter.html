@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Media Hub - Relvet</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #7c3aed; --primary-hover: #8b5cf6; --bg-color: #f8f9fa; 
+            --content-bg: #ffffff; --sidebar-bg: #111827; --text-color: #111827; 
+            --text-secondary: #4b5563; --border-color: #e5e7eb; --shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --sidebar-width: 260px; --topbar-height: 60px; --border-radius: 12px;
+        }
+        body.dark-mode {
+            --bg-color: #121212; --content-bg: #1e1e1e; --sidebar-bg: #1e1e1e;
+            --text-color: #e5e5e5; --text-secondary: #888888; --border-color: #2e2e2e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-family: 'Poppins', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s; overflow-x: hidden; display: flex; flex-direction: column; }
+        
+        /* --- Relvet Template Shell --- */
+        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background-color: var(--sidebar-bg); color: #e5e5e5; padding: 20px; display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s ease-in-out; z-index: 1000; }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .sidebar-logo { font-size: 1.5rem; font-weight: 600; }
+        #close-sidebar-btn { background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; }
+        .sidebar-nav ul { list-style: none; }
+        .sidebar-nav li a { display: block; color: #d1d5db; text-decoration: none; padding: 15px; border-radius: 8px; font-weight: 500; transition: background-color 0.2s; cursor: pointer; }
+        .main-content { padding-top: var(--topbar-height); transition: margin-left 0.3s ease-in-out; flex-grow: 1; display: flex; flex-direction: column; }
+        body.sidebar-active .main-content { margin-left: var(--sidebar-width); }
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-height); background-color: var(--content-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 20px; z-index: 900; box-shadow: var(--shadow); }
+        #menu-btn { background: none; border: none; cursor: pointer; padding: 5px; z-index: 2; }
+        #menu-btn svg { width: 24px; height: 24px; stroke: var(--text-color); }
+        .app-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 600; }
+        .app-title svg { width: 28px; height: 28px; color: var(--primary-color); }
+        .page-container { padding: 30px; flex-grow: 1; display: flex; flex-direction: column; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s; }
+        .overlay.active { opacity: 1; visibility: visible; }
+
+        /* --- Tool Specific CSS --- */
+        .media-hub { display: flex; flex-direction: column; height: 100%; background: var(--content-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); overflow: hidden; }
+        #upload-view { display: flex; flex-direction: column; justify-content: center; align-items: center; flex-grow: 1; padding: 30px; }
+        #drop-zone { width: 100%; height: 100%; min-height: 400px; border: 3px dashed var(--border-color); border-radius: var(--border-radius); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; transition: all 0.2s ease; }
+        #drop-zone.drag-over { border-color: var(--primary-color); background-color: var(--bg-color); }
+        #drop-zone h2 { font-size: 1.5rem; }
+        #drop-zone p { color: var(--text-secondary); }
+        .btn { display: inline-block; padding: 10px 25px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .btn:disabled { background-color: var(--text-secondary) !important; cursor: not-allowed; transform: none; }
+        .btn-small { padding: 5px 10px; font-size: 0.8rem; }
+        
+        #processing-view { display: none; flex-direction: column; height: 100%; }
+        .settings-bar { padding: 15px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-color); display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-weight: 500; font-size: 0.9rem; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--content-bg); color: var(--text-color); }
+        #quality-slider { width: 100px; }
+        .main-actions { margin-left: auto; display: flex; gap: 10px; }
+        #image-grid { flex-grow: 1; overflow-y: auto; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .image-card { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        .image-card-preview { position: relative; width: 100%; height: 150px; background-color: var(--bg-color); }
+        .image-card-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .image-card-details { padding: 15px; font-size: 0.9rem; flex-grow: 1; display: flex; flex-direction: column; }
+        .image-card-details .filename { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .size-info { display: flex; justify-content: space-between; margin-top: 10px; align-items: baseline; }
+        .reduction-badge { background-color: #10b981; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; }
+        .error-badge { background-color: #ef4444; }
+        .card-actions { margin-top: auto; padding-top: 15px; }
+        .remove-btn { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; font-size: 16px; display: flex; justify-content: center; align-items: center; line-height: 1; opacity: 0; transition: opacity 0.2s; z-index: 10; }
+        .image-card:hover .remove-btn { opacity: 1; }
+        .processing-spinner { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.1); border-left-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; transform: translate(-50%, -50%); }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header"><span class="sidebar-logo">Relvet Menu</span><button id="close-sidebar-btn">&times;</button></div>
+        <nav class="sidebar-nav"><ul>
+            <li><a href="index.html">Back to All Tools</a></li>
+            <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Rate Us</a></li>
+            <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Donate</a></li>
+        </ul></nav>
+    </aside>
+    <div class="main-content" id="main-content">
+        <header class="top-bar">
+            <button id="menu-btn"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg></button>
+            <div class="app-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg><span>Visual Media Hub</span></div>
+        </header>
+        <main class="page-container" id="page-container">
+            <div class="media-hub">
+                <div id="upload-view">
+                    <div id="drop-zone">
+                        <h2>Drag & Drop Images Here</h2><p>or</p>
+                        <button class="btn" id="browse-btn">Browse Files</button>
+                        <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+                        <p style="font-size: 0.8rem; margin-top: 20px;">All processing is done on your device. No images are uploaded.</p>
+                    </div>
+                </div>
+                <div id="processing-view">
+                    <div class="settings-bar">
+                        <div class="form-group"><label>Format</label><select id="format-select"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+                        <div class="form-group" id="quality-group"><label>Quality (<span id="quality-value">90</span>%)</label><input type="range" id="quality-slider" min="1" max="100" value="90"></div>
+                        <div class="form-group"><label>Resize</label><select id="resize-select"><option value="none">None</option><option value="percent">By Percentage</option><option value="width">By Max Width</option><option value="height">By Max Height</option></select></div>
+                        <div class="form-group" id="resize-value-group" style="display:none;"><label id="resize-label">%</label><input type="number" id="resize-value" value="50" min="1"></div>
+                        <div class="main-actions">
+                            <button class="btn" id="add-more-btn">Add More</button>
+                            <button class="btn" id="download-all-btn">Download All (.zip)</button>
+                        </div>
+                    </div>
+                    <div id="image-grid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- FULLY FUNCTIONAL APP SHELL SCRIPT ---
+        const sidebar = document.getElementById('sidebar');
+        const menuBtn = document.getElementById('menu-btn');
+        const closeBtn = document.getElementById('close-sidebar-btn');
+        const overlay = document.getElementById('overlay');
+        if (menuBtn && sidebar && closeBtn && overlay) {
+            const openSidebar = () => { sidebar.classList.add('active'); overlay.classList.add('active'); document.body.classList.add('sidebar-active'); };
+            const closeSidebar = () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); document.body.classList.remove('sidebar-active'); };
+            menuBtn.addEventListener('click', openSidebar);
+            closeBtn.addEventListener('click', closeSidebar);
+            overlay.addEventListener('click', closeSidebar);
+        }
+        
+        // --- VISUAL MEDIA HUB SCRIPT ---
+        let imageState = [];
+        let stateIdCounter = 0;
+        let processDebounceTimer;
+
+        const ui = {
+            uploadView: document.getElementById('upload-view'), processingView: document.getElementById('processing-view'),
+            dropZone: document.getElementById('drop-zone'), browseBtn: document.getElementById('browse-btn'),
+            fileInput: document.getElementById('file-input'), addMoreBtn: document.getElementById('add-more-btn'),
+            imageGrid: document.getElementById('image-grid'), downloadAllBtn: document.getElementById('download-all-btn'),
+            formatSelect: document.getElementById('format-select'), qualityGroup: document.getElementById('quality-group'),
+            qualitySlider: document.getElementById('quality-slider'), qualityValue: document.getElementById('quality-value'),
+            resizeSelect: document.getElementById('resize-select'), resizeValueGroup: document.getElementById('resize-value-group'),
+            resizeLabel: document.getElementById('resize-label'), resizeValue: document.getElementById('resize-value'),
+        };
+
+        function handleFiles(files) {
+            ui.uploadView.style.display = 'none';
+            ui.processingView.style.display = 'flex';
+            const newFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+            newFiles.forEach(file => {
+                const imageId = stateIdCounter++;
+                const imageObject = {
+                    id: imageId, originalFile: file, originalDataUrl: null,
+                    processedBlob: null, status: 'reading'
+                };
+                imageState.push(imageObject);
+                renderCard(imageObject); // Render card immediately
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imageObject.originalDataUrl = e.target.result;
+                    imageObject.status = 'pending';
+                    updateCard(imageObject); // Update card with image preview
+                    processAllImages();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function processAllImages() {
+            ui.downloadAllBtn.disabled = true;
+            ui.downloadAllBtn.textContent = 'Processing...';
+            imageState.forEach(img => {
+                if(img.status !== 'reading') {
+                    img.status = 'processing';
+                    updateCard(img);
+                }
+            });
+            clearTimeout(processDebounceTimer);
+            processDebounceTimer = setTimeout(async () => {
+                for (const img of imageState) {
+                    if (img.originalDataUrl) {
+                        await processImage(img);
+                        updateCard(img);
+                    }
+                }
+                ui.downloadAllBtn.disabled = false;
+                ui.downloadAllBtn.textContent = 'Download All (.zip)';
+            }, 300);
+        }
+
+        async function processImage(img) {
+            return new Promise((resolve) => {
+                const image = new Image();
+                image.onerror = () => { img.status = 'error'; resolve(); };
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    let newWidth = image.width, newHeight = image.height;
+                    const resizeMode = ui.resizeSelect.value, resizeValue = parseInt(ui.resizeValue.value);
+
+                    if (resizeMode !== 'none' && resizeValue > 0) {
+                        const ratio = image.width / image.height;
+                        if (resizeMode === 'percent') {
+                            newWidth *= (resizeValue / 100); newHeight *= (resizeValue / 100);
+                        } else if (resizeMode === 'width' && image.width > resizeValue) {
+                            newWidth = resizeValue; newHeight = resizeValue / ratio;
+                        } else if (resizeMode === 'height' && image.height > resizeValue) {
+                            newHeight = resizeValue; newWidth = resizeValue * ratio;
+                        }
+                    }
+
+                    canvas.width = newWidth; canvas.height = newHeight;
+                    ctx.drawImage(image, 0, 0, newWidth, newHeight);
+                    const format = ui.formatSelect.value, quality = parseInt(ui.qualitySlider.value) / 100;
+                    
+                    canvas.toBlob(blob => {
+                        img.processedBlob = blob;
+                        img.status = 'done';
+                        resolve();
+                    }, format, quality);
+                };
+                image.src = img.originalDataUrl;
+            });
+        }
+        
+        function renderCard(img) {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.dataset.id = img.id;
+            card.innerHTML = `<div class="image-card-preview"><img src="" style="display:none;"><div class="processing-spinner"></div></div><div class="image-card-details"><div class="filename">${img.originalFile.name}</div><div class="size-info"><span class="original-size"></span><span class="reduction-badge" style="display:none;"></span></div><div class="card-actions"><button class="btn btn-small download-single-btn" disabled>Download</button></div></div><button class="remove-btn" title="Remove">&times;</button>`;
+            ui.imageGrid.appendChild(card);
+        }
+        
+        function updateCard(img) {
+            const card = ui.imageGrid.querySelector(`[data-id='${img.id}']`);
+            if (!card) return;
+
+            const previewImg = card.querySelector('img'), spinner = card.querySelector('.processing-spinner'),
+                  originalSizeEl = card.querySelector('.original-size'), reductionBadge = card.querySelector('.reduction-badge'),
+                  downloadBtn = card.querySelector('.download-single-btn');
+
+            if (img.originalDataUrl) {
+                previewImg.src = img.originalDataUrl;
+                previewImg.style.display = 'block';
+            }
+
+            originalSizeEl.textContent = `Original: ${formatBytes(img.originalFile.size)}`;
+            spinner.style.display = ['processing', 'reading'].includes(img.status) ? 'block' : 'none';
+            downloadBtn.disabled = img.status !== 'done';
+
+            if (img.status === 'done' && img.processedBlob) {
+                const reduction = 100 - (img.processedBlob.size / img.originalFile.size * 100);
+                reductionBadge.style.display = 'inline-block';
+                reductionBadge.classList.toggle('error-badge', reduction < 0);
+                reductionBadge.textContent = `${reduction > 0 ? '-' : '+'}${Math.abs(reduction).toFixed(0)}% (${formatBytes(img.processedBlob.size)})`;
+            } else if (img.status === 'error') {
+                 reductionBadge.style.display = 'inline-block';
+                 reductionBadge.classList.add('error-badge');
+                 reductionBadge.textContent = 'Error';
+            } else {
+                reductionBadge.style.display = 'none';
+            }
+        }
+
+        ui.imageGrid.addEventListener('click', e => {
+            const card = e.target.closest('.image-card');
+            if (!card) return;
+            const id = parseInt(card.dataset.id);
+            const img = imageState.find(i => i.id === id);
+
+            if (e.target.classList.contains('remove-btn')) {
+                imageState = imageState.filter(i => i.id !== id);
+                card.remove();
+                if (imageState.length === 0) {
+                     ui.uploadView.style.display = 'flex';
+                     ui.processingView.style.display = 'none';
+                }
+            } else if (e.target.classList.contains('download-single-btn') && img && img.processedBlob) {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(img.processedBlob);
+                link.download = getNewFilename(img.originalFile.name, ui.formatSelect.value);
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+        });
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => ui.dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }));
+        ui.dropZone.addEventListener('dragenter', () => ui.dropZone.classList.add('drag-over'));
+        ui.dropZone.addEventListener('dragleave', () => ui.dropZone.classList.remove('drag-over'));
+        ui.dropZone.addEventListener('drop', e => { ui.dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+        
+        ui.browseBtn.addEventListener('click', () => ui.fileInput.click());
+        ui.addMoreBtn.addEventListener('click', () => ui.fileInput.click());
+        ui.fileInput.addEventListener('change', () => { handleFiles(ui.fileInput.files); ui.fileInput.value = ''; });
+        
+        [ui.formatSelect, ui.resizeSelect, ui.resizeValue].forEach(el => el.addEventListener('change', () => { saveSettings(); processAllImages(); }));
+        ui.qualitySlider.addEventListener('input', () => { ui.qualityValue.textContent = ui.qualitySlider.value; });
+        ui.qualitySlider.addEventListener('change', () => { saveSettings(); processAllImages(); });
+        
+        ui.formatSelect.addEventListener('change', () => ui.qualityGroup.style.display = ui.formatSelect.value === 'image/png' ? 'none' : 'flex');
+        ui.resizeSelect.addEventListener('change', () => {
+            const mode = ui.resizeSelect.value;
+            ui.resizeValueGroup.style.display = mode === 'none' ? 'none' : 'flex';
+            const labels = { 'percent': '%', 'width': 'px W', 'height': 'px H' };
+            ui.resizeLabel.textContent = labels[mode] || '';
+        });
+        
+        ui.downloadAllBtn.addEventListener('click', async () => {
+            ui.downloadAllBtn.disabled = true; ui.downloadAllBtn.textContent = 'Zipping...';
+            const zip = new JSZip();
+            for (const img of imageState) {
+                if (img.processedBlob) zip.file(getNewFilename(img.originalFile.name, ui.formatSelect.value), img.processedBlob);
+            }
+            const content = await zip.generateAsync({type:"blob"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content); link.download = 'optimized_images.zip'; link.click();
+            URL.revokeObjectURL(link.href);
+            ui.downloadAllBtn.disabled = false; ui.downloadAllBtn.textContent = 'Download All (.zip)';
+        });
+
+        function saveSettings() {
+            const settings = { format: ui.formatSelect.value, quality: ui.qualitySlider.value, resizeMode: ui.resizeSelect.value, resizeValue: ui.resizeValue.value };
+            localStorage.setItem('visualMediaHubSettings', JSON.stringify(settings));
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('visualMediaHubSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                ui.formatSelect.value = settings.format || 'image/jpeg';
+                ui.qualitySlider.value = settings.quality || '90';
+                ui.qualityValue.textContent = settings.quality || '90';
+                ui.resizeSelect.value = settings.resizeMode || 'none';
+                ui.resizeValue.value = settings.resizeValue || '50';
+                ui.formatSelect.dispatchEvent(new Event('change'));
+                ui.resizeSelect.dispatchEvent(new Event('change'));
+            }
+        }
+        
+        function formatBytes(b,d=1){if(b===0)return'0 B';const k=1024,s=["B","KB","MB","GB"],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/Math.pow(k,i)).toFixed(d))+' '+s[i]}
+        function getNewFilename(n, m){const i=n.lastIndexOf('.'),a=i<0?n:n.substring(0,i),e=m.split('/')[1];return`${a}.${e}`}
+
+        loadSettings();
+    });
+    </script>
+</body>
+</html>

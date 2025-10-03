@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Engine - Relvet</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --focus-color: #f59e0b; --focus-hover: #fbbf24; --break-color: #3b82f6; --break-hover: #60a5fa;
+            --primary-color: var(--focus-color); --primary-hover: var(--focus-hover);
+            --bg-color: #f8f9fa; --content-bg: #ffffff; --sidebar-bg: #111827;
+            --text-color: #111827; --text-secondary: #4b5563; --border-color: #e5e7eb;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --sidebar-width: 260px; --topbar-height: 60px; --border-radius: 12px;
+        }
+        body.break-mode { --primary-color: var(--break-color); --primary-hover: var(--break-hover); }
+        body.dark-mode {
+            --bg-color: #121212; --content-bg: #1e1e1e; --sidebar-bg: #1e1e1e;
+            --text-color: #e5e5e5; --text-secondary: #888888; --border-color: #2e2e2e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s; overflow-x: hidden; display: flex; flex-direction: column; }
+        
+        /* --- Relvet Template Shell --- */
+        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background-color: var(--sidebar-bg); color: #e5e5e5; padding: 20px; display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s ease-in-out; z-index: 1000; }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .sidebar-logo { font-size: 1.5rem; font-weight: 600; }
+        #close-sidebar-btn { background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; }
+        .sidebar-nav ul { list-style: none; }
+        .sidebar-nav li a { display: block; color: #d1d5db; text-decoration: none; padding: 15px; border-radius: 8px; font-weight: 500; transition: background-color 0.2s, color 0.2s; cursor: pointer; }
+        .sidebar-nav li a:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .main-content { padding-top: var(--topbar-height); transition: margin-left 0.3s ease-in-out; flex-grow: 1; display: flex; flex-direction: column; }
+        body.sidebar-active .main-content { margin-left: var(--sidebar-width); }
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-height); background-color: var(--content-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 20px; z-index: 900; box-shadow: var(--shadow); }
+        #menu-btn { background: none; border: none; cursor: pointer; padding: 5px; z-index: 2; }
+        #menu-btn svg { width: 24px; height: 24px; stroke: var(--text-color); }
+        .app-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 600; }
+        .app-title svg { width: 28px; height: 28px; color: var(--primary-color); transition: color 0.4s ease; }
+        .page-container { padding: 30px; flex-grow: 1; }
+        .donate-footer { padding: 25px; text-align: center; background-color: var(--content-bg); border-top: 1px solid var(--border-color); }
+        .btn { display: inline-block; padding: 10px 25px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s; }
+        .overlay.active { opacity: 1; visibility: visible; }
+
+        /* --- Pomodoro Tool CSS --- */
+        .app-container { display: grid; grid-template-columns: 1fr; gap: 30px; max-width: 900px; margin: 0 auto; }
+        @media (min-width: 920px) { .app-container { grid-template-columns: 350px 1fr; } }
+        .timer-panel, .task-panel { background-color: var(--content-bg); padding: 30px; border-radius: var(--border-radius); box-shadow: var(--shadow); }
+        .mode-selector { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
+        .mode-btn { background: var(--bg-color); color: var(--text-secondary); border: none; padding: 8px 15px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .mode-btn.active { background: var(--primary-color); color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .timer-display { position: relative; width: 220px; height: 220px; margin: 0 auto 30px; }
+        .progress-ring { transform: rotate(-90deg); }
+        .progress-ring__circle { stroke-width: 10px; fill: transparent; transition: stroke-dashoffset 0.5s, stroke 0.4s ease; stroke: var(--primary-color); stroke-linecap: round; }
+        .progress-ring__bg { stroke-width: 10px; fill: transparent; stroke: var(--border-color); }
+        #time-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 600; color: var(--text-color); letter-spacing: 1px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        #start-pause-btn { grid-column: 1 / -1; padding: 15px; font-size: 1.2rem; }
+        .btn-icon { background: none; border: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-icon:hover { background: var(--bg-color); border-color: var(--text-secondary); }
+        .task-panel h2 { margin-bottom: 10px; font-size: 1.3rem; }
+        #current-task-display { font-weight: 600; color: var(--primary-color); min-height: 24px; margin-bottom: 20px; transition: color 0.4s ease; font-size: 1.1rem; }
+        .task-input-group { display: flex; gap: 10px; margin-bottom: 30px; }
+        #task-input { flex-grow: 1; padding: 12px; font-size: 1rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); }
+        #task-log { list-style: none; max-height: 250px; overflow-y: auto; padding-right: 10px; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
+        #task-log li { padding: 10px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        #task-log li:last-child { border-bottom: none; }
+        #task-log li .time { font-size: 0.9em; color: var(--text-secondary); font-family: monospace; }
+        #cycle-count { text-align: center; font-weight: 500; margin-bottom: 20px; color: var(--text-secondary); }
+        #settings-btn { margin-top: 20px; width: 100%; }
+        #settings-panel { display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color); }
+        .settings-grid { display: grid; grid-template-columns: 1fr 80px; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .settings-grid label { font-weight: 500; }
+        .settings-grid input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); text-align: center; font-size: 1rem; }
+        .settings-grid input[type="checkbox"] { width: 24px; height: 24px; justify-self: center; accent-color: var(--primary-color); }
+    </style>
+</head>
+<body class="focus-mode">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header"><span class="sidebar-logo">Relvet Menu</span><button id="close-sidebar-btn">&times;</button></div>
+        <nav class="sidebar-nav"><ul>
+            <li><a href="index.html">Back to All Tools</a></li>
+            <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Rate Us</a></li>
+            <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Donate</a></li>
+        </ul></nav>
+    </aside>
+    <div class="main-content" id="main-content">
+        <header class="top-bar">
+            <button id="menu-btn"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg></button>
+            <div class="app-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Focus Engine</span></div>
+        </header>
+        <main class="page-container" id="page-container">
+            <div class="app-container">
+                <div class="timer-panel">
+                    <div class="mode-selector">
+                        <button class="mode-btn active" id="mode-focus">Focus</button>
+                        <button class="mode-btn" id="mode-short-break">Short Break</button>
+                        <button class="mode-btn" id="mode-long-break">Long Break</button>
+                    </div>
+                    <div class="timer-display">
+                        <svg class="progress-ring" width="220" height="220">
+                            <circle class="progress-ring__bg" r="100" cx="110" cy="110" />
+                            <circle class="progress-ring__circle" id="progress-circle" r="100" cx="110" cy="110" />
+                        </svg>
+                        <div id="time-display">25:00</div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn" id="start-pause-btn">START</button>
+                        <button class="btn btn-icon" id="reset-btn">Reset</button>
+                        <button class="btn btn-icon" id="skip-btn">Skip</button>
+                    </div>
+                    <button class="btn btn-icon" id="settings-btn" style="margin-top: 20px;">Settings</button>
+                    <div id="settings-panel">
+                        <div class="settings-grid">
+                            <label for="focus-duration">Focus (min)</label><input type="number" id="focus-duration" min="1">
+                            <label for="short-break-duration">Short Break (min)</label><input type="number" id="short-break-duration" min="1">
+                            <label for="long-break-duration">Long Break (min)</label><input type="number" id="long-break-duration" min="1">
+                            <label for="cycles-for-long-break">Cycles for Long Break</label><input type="number" id="cycles-for-long-break" min="1">
+                            <label for="audio-toggle">Audio Ticking</label><input type="checkbox" id="audio-toggle">
+                        </div>
+                    </div>
+                </div>
+                <div class="task-panel">
+                    <h2>Current Task:</h2>
+                    <p id="current-task-display">Set a task to begin</p>
+                    <div class="task-input-group">
+                        <input type="text" id="task-input" placeholder="What are you working on?">
+                        <button class="btn" id="set-task-btn">Set</button>
+                    </div>
+                    <h2>Today's Log</h2>
+                    <p id="cycle-count">Completed Cycles: 0</p>
+                    <ul id="task-log"></ul>
+                </div>
+            </div>
+        </main>
+        <footer class="donate-footer"><p>&copy; 2023 Relvet Tools. All rights reserved.</p></footer>
+    </div>
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- FULLY FUNCTIONAL APP SHELL SCRIPT ---
+            const sidebar = document.getElementById('sidebar');
+            const menuBtn = document.getElementById('menu-btn');
+            const closeBtn = document.getElementById('close-sidebar-btn');
+            const overlay = document.getElementById('overlay');
+            if (menuBtn && sidebar && closeBtn && overlay) {
+                const openSidebar = () => { sidebar.classList.add('active'); overlay.classList.add('active'); document.body.classList.add('sidebar-active'); };
+                const closeSidebar = () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); document.body.classList.remove('sidebar-active'); };
+                menuBtn.addEventListener('click', openSidebar);
+                closeBtn.addEventListener('click', closeSidebar);
+                overlay.addEventListener('click', closeSidebar);
+            }
+            
+            // --- POMODORO ENGINE SCRIPT ---
+            let audioContext;
+            const state = {
+                mode: 'focus', timerId: null, timeRemaining: 0, isRunning: false, 
+                dailyProgress: { date: '', cycles: 0, tasks: [] },
+                currentTask: 'No task set',
+                settings: { focus: 25, shortBreak: 5, longBreak: 15, cyclesForLongBreak: 4, enableAudio: false }
+            };
+
+            const DOMElements = {
+                timeDisplay: document.getElementById('time-display'),
+                progressCircle: document.getElementById('progress-circle'),
+                startPauseBtn: document.getElementById('start-pause-btn'),
+                resetBtn: document.getElementById('reset-btn'),
+                skipBtn: document.getElementById('skip-btn'),
+                modeBtns: { focus: document.getElementById('mode-focus'), shortBreak: document.getElementById('mode-short-break'), longBreak: document.getElementById('mode-long-break') },
+                taskInput: document.getElementById('task-input'),
+                setTaskBtn: document.getElementById('set-task-btn'),
+                currentTaskDisplay: document.getElementById('current-task-display'),
+                taskLog: document.getElementById('task-log'),
+                cycleCountDisplay: document.getElementById('cycle-count'),
+                settingsBtn: document.getElementById('settings-btn'),
+                settingsPanel: document.getElementById('settings-panel'),
+                settingsInputs: {
+                    focus: document.getElementById('focus-duration'), shortBreak: document.getElementById('short-break-duration'),
+                    longBreak: document.getElementById('long-break-duration'), cyclesForLongBreak: document.getElementById('cycles-for-long-break'),
+                    enableAudio: document.getElementById('audio-toggle')
+                }
+            };
+
+            const circleRadius = DOMElements.progressCircle.r.baseVal.value;
+            const circumference = 2 * Math.PI * circleRadius;
+            DOMElements.progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+
+            function initAudio() { if (!audioContext) { audioContext = new (window.AudioContext || window.webkitAudioContext)(); }}
+
+            function playSound(type) {
+                if (!audioContext) return;
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                if (type === 'tick' && state.settings.enableAudio) {
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.1);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                } else if (type === 'alarm') {
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 1);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 1);
+                }
+            }
+            
+            function updateDisplay() {
+                const totalDuration = state.settings[state.mode] * 60;
+                const minutes = Math.floor(state.timeRemaining / 60);
+                const seconds = state.timeRemaining % 60;
+                const display = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                DOMElements.timeDisplay.textContent = display;
+                document.title = `${display} - ${state.currentTask}`;
+                
+                const progress = totalDuration > 0 ? (totalDuration - state.timeRemaining) / totalDuration : 0;
+                const offset = circumference - progress * circumference;
+                DOMElements.progressCircle.style.strokeDashoffset = offset;
+            }
+
+            function switchMode(newMode, resetTimer = true) {
+                if (state.isRunning) toggleTimer(); // Pause timer before switching
+                
+                state.mode = newMode;
+                
+                if(resetTimer) {
+                    state.timeRemaining = state.settings[newMode] * 60;
+                }
+                
+                Object.values(DOMElements.modeBtns).forEach(btn => btn.classList.remove('active'));
+                const activeBtnKey = newMode.includes('short') ? 'shortBreak' : newMode.includes('long') ? 'longBreak' : 'focus';
+                DOMElements.modeBtns[activeBtnKey].classList.add('active');
+
+                document.body.classList.toggle('break-mode', newMode.includes('Break'));
+                DOMElements.startPauseBtn.textContent = 'START';
+                updateDisplay();
+            }
+
+            function tick() {
+                state.timeRemaining--;
+                playSound('tick');
+                
+                if (state.timeRemaining < 0) {
+                    playSound('alarm');
+                    showNotification();
+
+                    if (state.mode === 'focus') {
+                        state.dailyProgress.cycles++;
+                        logTask();
+                        if (state.dailyProgress.cycles % state.settings.cyclesForLongBreak === 0) {
+                            switchMode('longBreak');
+                        } else {
+                            switchMode('shortBreak');
+                        }
+                    } else {
+                        switchMode('focus');
+                    }
+                    saveState();
+                }
+                updateDisplay();
+            }
+
+            function toggleTimer() {
+                initAudio();
+                state.isRunning = !state.isRunning;
+                if (state.isRunning) {
+                    DOMElements.startPauseBtn.textContent = 'PAUSE';
+                    state.timerId = setInterval(tick, 1000);
+                } else {
+                    clearInterval(state.timerId);
+                    DOMElements.startPauseBtn.textContent = 'START';
+                }
+            }
+
+            function saveState() {
+                localStorage.setItem('pomodoroFocusEngine', JSON.stringify({
+                    settings: state.settings,
+                    dailyProgress: state.dailyProgress,
+                    currentTask: state.currentTask
+                }));
+            }
+
+            function loadState() {
+                const savedState = localStorage.getItem('pomodoroFocusEngine');
+                const today = new Date().toISOString().slice(0, 10);
+
+                if (savedState) {
+                    const loaded = JSON.parse(savedState);
+                    // Keep settings always
+                    if (loaded.settings) state.settings = loaded.settings;
+                    // Check if progress is from today
+                    if (loaded.dailyProgress && loaded.dailyProgress.date === today) {
+                        state.dailyProgress = loaded.dailyProgress;
+                    } else {
+                        // It's a new day, reset progress but keep settings
+                        state.dailyProgress = { date: today, cycles: 0, tasks: [] };
+                    }
+                    state.currentTask = loaded.currentTask || 'No task set';
+                } else {
+                    // First time user, set today's date
+                    state.dailyProgress.date = today;
+                }
+            }
+            
+            function updateUIFromState() {
+                Object.keys(DOMElements.settingsInputs).forEach(key => {
+                    const input = DOMElements.settingsInputs[key];
+                    if (input.type === 'checkbox') {
+                        input.checked = state.settings[key];
+                    } else {
+                        input.value = state.settings[key];
+                    }
+                });
+                
+                DOMElements.currentTaskDisplay.textContent = state.currentTask;
+                DOMElements.cycleCountDisplay.textContent = `Completed Cycles: ${state.dailyProgress.cycles}`;
+                
+                DOMElements.taskLog.innerHTML = '';
+                state.dailyProgress.tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${task.name}</span><span class="time">${task.time}</span>`;
+                    DOMElements.taskLog.prepend(li); // Prepend to show latest first
+                });
+
+                switchMode(state.mode); // This sets the correct time on the display
+            }
+
+            function logTask() {
+                const now = new Date();
+                const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                state.dailyProgress.tasks.push({name: state.currentTask, time: timeString});
+            }
+
+            function showNotification() {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    const body = state.mode === 'focus' ? "Time for a well-deserved break!" : "Time to get back to focus!";
+                    new Notification("Session Complete!", { body: body });
+                }
+            }
+
+            // --- Event Listeners ---
+            DOMElements.startPauseBtn.addEventListener('click', toggleTimer);
+            DOMElements.resetBtn.addEventListener('click', () => switchMode(state.mode));
+            DOMElements.skipBtn.addEventListener('click', () => {
+                if(confirm("Are you sure you want to skip to the next session?")) {
+                    const nextMode = state.mode === 'focus' ? 
+                        ((state.dailyProgress.cycles + 1) % state.settings.cyclesForLongBreak === 0 ? 'longBreak' : 'shortBreak') : 'focus';
+                    if (state.mode === 'focus') { state.dailyProgress.cycles++; logTask(); }
+                    switchMode(nextMode);
+                    saveState();
+                    updateUIFromState();
+                }
+            });
+
+            for (const modeKey in DOMElements.modeBtns) {
+                DOMElements.modeBtns[modeKey].addEventListener('click', () => switchMode(modeKey === 'shortBreak' ? 'shortBreak' : modeKey === 'longBreak' ? 'longBreak' : 'focus'));
+            }
+
+            DOMElements.setTaskBtn.addEventListener('click', () => {
+                const task = DOMElements.taskInput.value.trim();
+                if (task) {
+                    state.currentTask = task;
+                    DOMElements.currentTaskDisplay.textContent = task;
+                    DOMElements.taskInput.value = '';
+                    saveState();
+                }
+            });
+            DOMElements.taskInput.addEventListener('keyup', (e) => { if(e.key === 'Enter') DOMElements.setTaskBtn.click(); });
+
+            DOMElements.settingsBtn.addEventListener('click', () => {
+                const panel = DOMElements.settingsPanel;
+                panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+            });
+            
+            Object.keys(DOMElements.settingsInputs).forEach(key => {
+                const input = DOMElements.settingsInputs[key];
+                input.addEventListener('change', () => {
+                    if (input.type === 'checkbox') {
+                         state.settings[key] = input.checked;
+                    } else {
+                        const value = parseInt(input.value);
+                        if(value > 0) state.settings[key] = value;
+                    }
+                    saveState();
+                    // If timer is NOT running, update the display immediately
+                    if (!state.isRunning) {
+                        switchMode(state.mode);
+                    }
+                });
+            });
+
+            // --- Initialization ---
+            function init() {
+                if ('Notification' in window && Notification.permission !== 'denied') {
+                    Notification.requestPermission();
+                }
+                loadState();
+                updateUIFromState();
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Tool (Viewer, Formatter, Converter) - Relvet</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- App Shell & Variables --- */
+        :root {
+            --primary-color: #f59e0b; --primary-hover: #fbbf24; --bg-color: #f8f9fa; 
+            --content-bg: #ffffff; --sidebar-bg: #111827; --text-color: #111827; 
+            --text-secondary: #4b5563; --border-color: #e5e7eb; --shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --sidebar-width: 260px; --topbar-height: 60px; --border-radius: 12px;
+            --json-key: #92278f; --json-string: #2a9292; --json-number: #2573c5; --json-boolean: #f98280; --json-null: #808080;
+        }
+        body.dark-mode {
+            --bg-color: #121212; --content-bg: #1e1e1e; --sidebar-bg: #1e1e1e;
+            --text-color: #e5e5e5; --text-secondary: #888888; --border-color: #2e2e2e;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --json-key: #e06c75; --json-string: #98c379; --json-number: #61afef; --json-boolean: #d19a66; --json-null: #abb2bf;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; overflow-x: hidden; display: flex; flex-direction: column; }
+        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width); background-color: var(--sidebar-bg); color: #e5e5e5; padding: 20px; display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s ease-in-out; z-index: 1000; }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .sidebar-logo { font-size: 1.5rem; font-weight: 600; }
+        #close-sidebar-btn { background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
+        .sidebar-nav ul { list-style: none; }
+        .sidebar-nav li a { display: block; color: #d1d5db; text-decoration: none; padding: 15px; border-radius: 8px; font-weight: 500; transition: background-color 0.2s, color 0.2s; cursor: pointer; }
+        .sidebar-nav li a:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .main-content { padding-top: var(--topbar-height); transition: margin-left 0.3s ease-in-out; flex-grow: 1; display: flex; flex-direction: column; }
+        body.sidebar-active .main-content { margin-left: var(--sidebar-width); }
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-height); background-color: var(--content-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 20px; z-index: 900; transition: background-color 0.3s, border-color 0.3s; box-shadow: var(--shadow); }
+        #menu-btn { background: none; border: none; cursor: pointer; padding: 5px; z-index: 2; }
+        #menu-btn svg { width: 24px; height: 24px; stroke: var(--text-color); }
+        .app-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 600; color: var(--text-color); }
+        .app-title svg { width: 28px; height: 28px; color: var(--primary-color); }
+        .page-container { padding: 30px; flex-grow: 1; display: flex; flex-direction: column; }
+        h1 { font-size: 2.5rem; margin-bottom: 30px; }
+        .donate-footer { padding: 25px; text-align: center; background-color: var(--content-bg); border-top: 1px solid var(--border-color); transition: background-color 0.3s, border-color 0.3s; }
+        .btn { display: inline-block; padding: 10px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.2s ease; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .btn-secondary { background-color: #64748b; } .btn-secondary:hover { background-color: #94a3b8; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .overlay.active { opacity: 1; visibility: visible; }
+        
+        /* --- Tool Specific CSS --- */
+        .tool-container { display: grid; grid-template-columns: 1fr; gap: 30px; flex-grow: 1; min-height: 500px; }
+        @media (min-width: 1024px) { .tool-container { grid-template-columns: 1fr 1.2fr; } }
+        .panel { background-color: var(--content-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--border-color); }
+        .panel-header h2 { font-size: 1.3rem; margin: 0; }
+        .btn-group { display: flex; gap: 10px; }
+        .panel-body { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
+        textarea#json-input { width: 100%; flex-grow: 1; padding: 15px; font-size: 1rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); resize: none; font-family: monospace; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); }
+        .tab-link { padding: 10px 20px; cursor: pointer; border: none; background-color: transparent; font-size: 1rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+        .tab-link.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .tab-content { display: none; padding: 20px; flex-grow: 1; overflow: auto; }
+        .tab-content.active { display: block; }
+        #viewer-output { font-family: monospace; font-size: 0.95rem; white-space: pre; }
+        #viewer-output .json-key { color: var(--json-key); font-weight: bold; }
+        #viewer-output .json-string { color: var(--json-string); }
+        #viewer-output .json-number { color: var(--json-number); }
+        #viewer-output .json-boolean { color: var(--json-boolean); }
+        #viewer-output .json-null { color: var(--json-null); }
+        #viewer-output ul { list-style-type: none; padding-left: 2em; margin: 0; }
+        #viewer-output .collapsible { cursor: pointer; }
+        #viewer-output .collapser::before { content: '−'; display: inline-block; width: 1em; }
+        #viewer-output .collapsed > .collapser::before { content: '+'; }
+        #viewer-output .collapsed > ul { display: none; }
+        #viewer-output .ellipsis { color: var(--text-secondary); }
+        .converter-options { margin-bottom: 20px; display: flex; gap: 20px; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .checkbox-group input[type="checkbox"] { width: 1.2em; height: 1.2em; accent-color: var(--primary-color); }
+        #status-message { margin-top: 20px; padding: 15px; border-radius: 8px; background-color: var(--bg-color); color: var(--text-secondary); text-align: center; }
+        .error { background-color: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+        .success { background-color: #f0fdf4; color: #22c55e; border: 1px solid #bbf7d0; }
+    </style>
+</head>
+<body class="light-mode">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">Relvet Menu</span>
+            <button id="close-sidebar-btn">&times;</button>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a href="index.html">Back to All Tools</a></li>
+                <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Rate Us</a></li>
+                <li><a href="https://studynowmed.my.canva.site/donate-relvet" target="_blank">Donate</a></li>
+            </ul>
+        </nav>
+    </aside>
+    <div class="main-content" id="main-content">
+        <header class="top-bar">
+            <button id="menu-btn"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg></button>
+            <div class="app-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" /></svg><span>JSON Tool</span></div>
+        </header>
+        <main class="page-container" id="page-container">
+            <h1>JSON Viewer, Formatter & Converter</h1>
+            <div class="tool-container">
+                <!-- INPUT PANEL -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Input</h2>
+                        <div class="btn-group">
+                            <label for="file-upload" class="btn btn-secondary">Upload</label>
+                            <input type="file" id="file-upload" accept=".json, .txt" style="display: none;">
+                        </div>
+                    </div>
+                    <textarea id="json-input" placeholder='Paste your JSON here...\n\n{"example": {"id": 1, "data": ["value1", "value2"], "isValid": true}}'></textarea>
+                </div>
+
+                <!-- OUTPUT & ACTIONS PANEL -->
+                <div class="panel">
+                    <div class="tabs">
+                        <button class="tab-link active" data-tab="viewer-tab">Viewer & Formatter</button>
+                        <button class="tab-link" data-tab="converter-tab">Convert to CSV</button>
+                    </div>
+                    <div id="viewer-tab" class="tab-content active">
+                        <div class="panel-header" style="padding:0 0 15px 0;">
+                            <h2>Formatted Output</h2>
+                            <div class="btn-group">
+                                <button id="copy-json-btn" class="btn btn-secondary">Copy</button>
+                                <button id="download-json-btn" class="btn">Download</button>
+                            </div>
+                        </div>
+                        <div id="viewer-output">Enter valid JSON and it will be formatted here.</div>
+                    </div>
+                    <div id="converter-tab" class="tab-content">
+                        <h2>JSON to CSV Options</h2>
+                        <div class="converter-options">
+                             <div class="checkbox-group">
+                                <input type="checkbox" id="flatten-json" checked>
+                                <label for="flatten-json">Flatten Nested JSON</label>
+                            </div>
+                        </div>
+                        <button id="convert-csv-btn" class="btn" style="width:100%;">Convert & Download CSV</button>
+                        <div id="status-message">Awaiting conversion...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer class="donate-footer"><p>&copy; 2023 Relvet Tools. All rights reserved.</p></footer>
+    </div>
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- FULLY FUNCTIONAL APP SHELL SCRIPT ---
+            const sidebar = document.getElementById('sidebar');
+            const menuBtn = document.getElementById('menu-btn');
+            const closeBtn = document.getElementById('close-sidebar-btn');
+            const overlay = document.getElementById('overlay');
+            const openSidebar = () => { sidebar.classList.add('active'); overlay.classList.add('active'); document.body.classList.add('sidebar-active'); };
+            const closeSidebar = () => { sidebar.classList.remove('active'); overlay.classList.remove('active'); document.body.classList.remove('sidebar-active'); };
+            if (menuBtn) menuBtn.addEventListener('click', openSidebar);
+            if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+            if (overlay) overlay.addEventListener('click', closeSidebar);
+
+            // --- TOOL SCRIPT ---
+            const jsonInput = document.getElementById('json-input');
+            const fileUpload = document.getElementById('file-upload');
+            const viewerOutput = document.getElementById('viewer-output');
+            const copyJsonBtn = document.getElementById('copy-json-btn');
+            const downloadJsonBtn = document.getElementById('download-json-btn');
+            const convertCsvBtn = document.getElementById('convert-csv-btn');
+            const flattenCheck = document.getElementById('flatten-json');
+            const statusMessage = document.getElementById('status-message');
+            let currentJsonData = null;
+            let currentFormattedJsonText = '';
+
+            // --- INPUT HANDLING ---
+            jsonInput.addEventListener('input', processInput);
+            fileUpload.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    jsonInput.value = e.target.result;
+                    processInput();
+                };
+                reader.readAsText(file);
+            });
+
+            function processInput() {
+                const rawText = jsonInput.value.trim();
+                if (!rawText) {
+                    viewerOutput.innerHTML = '<span style="color: var(--text-secondary)">Paste JSON to begin.</span>';
+                    currentJsonData = null;
+                    return;
+                }
+                try {
+                    currentJsonData = JSON.parse(rawText);
+                    currentFormattedJsonText = JSON.stringify(currentJsonData, null, 2);
+                    renderJsonViewer(currentJsonData);
+                } catch (e) {
+                    currentJsonData = null;
+                    viewerOutput.innerHTML = `<span style="color: #ef4444; font-weight: bold;">Invalid JSON:</span><br>${e.message}`;
+                }
+            }
+
+            // --- JSON VIEWER LOGIC ---
+            function renderJsonViewer(json) {
+                viewerOutput.innerHTML = '';
+                const tree = buildTree(json, 'root');
+                viewerOutput.appendChild(tree);
+                viewerOutput.querySelectorAll('.collapsible').forEach(element => {
+                    element.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        element.parentElement.classList.toggle('collapsed');
+                    });
+                });
+            }
+
+            function buildTree(data) {
+                const type = Object.prototype.toString.call(data).slice(8, -1);
+
+                if (type === 'Object' || type === 'Array') {
+                    const isArray = type === 'Array';
+                    const container = document.createElement('ul');
+                    const parentLi = document.createElement('li');
+                    const openingBracket = isArray ? '[' : '{';
+                    const closingBracket = isArray ? ']' : '}';
+                    const len = isArray ? data.length : Object.keys(data).length;
+                    
+                    const toggle = document.createElement('span');
+                    toggle.className = 'collapsible';
+                    toggle.innerHTML = `<span class="collapser"></span>${openingBracket}<span class="ellipsis">...${closingBracket}</span>`;
+                    
+                    if (len === 0) {
+                        parentLi.innerHTML = `${openingBracket}${closingBracket}`;
+                        return parentLi;
+                    }
+                    parentLi.appendChild(toggle);
+                    parentLi.appendChild(container);
+
+                    for (const key in data) {
+                        const childLi = document.createElement('li');
+                        childLi.innerHTML = isArray ? '' : `<span class="json-key">"${key}"</span>: `;
+                        childLi.appendChild(buildTree(data[key]));
+                        container.appendChild(childLi);
+                    }
+                    return parentLi;
+                } else {
+                    const span = document.createElement('span');
+                    let className = `json-${typeof data}`;
+                    let value = data;
+                    if (data === null) {
+                        className = 'json-null'; value = 'null';
+                    } else if (typeof data === 'string') {
+                        value = `"${data.replace(/"/g, '\\"')}"`;
+                    }
+                    span.className = className;
+                    span.textContent = value;
+                    return span;
+                }
+            }
+            
+            // --- VIEWER ACTIONS ---
+            copyJsonBtn.addEventListener('click', () => copyText(currentFormattedJsonText, copyJsonBtn, 'Copy'));
+            downloadJsonBtn.addEventListener('click', () => downloadFile(currentFormattedJsonText, 'data.json', 'application/json'));
+
+            // --- JSON TO CSV CONVERTER LOGIC ---
+            convertCsvBtn.addEventListener('click', () => {
+                if (!currentJsonData) { updateStatus('Input is not valid JSON.', true); return; }
+                if (!Array.isArray(currentJsonData)) { updateStatus('CSV conversion requires a JSON Array of Objects.', true); return; }
+                try {
+                    const csv = convertToCsv(currentJsonData);
+                    downloadFile(csv, 'export.csv', 'text/csv');
+                    updateStatus(`Successfully converted ${currentJsonData.length} rows.`, false);
+                } catch(e) { updateStatus(`Conversion failed: ${e.message}`, true); }
+            });
+
+            function convertToCsv(jsonArray) {
+                const allKeys = new Set();
+                const flattenedData = jsonArray.map(row => {
+                    const flatRow = flattenCheck.checked ? flattenObject(row) : row;
+                    Object.keys(flatRow).forEach(key => allKeys.add(key));
+                    return flatRow;
+                });
+                const headers = Array.from(allKeys);
+                const headerRow = headers.map(formatCsvCell).join(',');
+                const rows = flattenedData.map(row => headers.map(header => formatCsvCell(row[header] ?? '')).join(','));
+                return `${headerRow}\n${rows.join('\n')}`;
+            }
+
+            function flattenObject(obj, prefix = '') {
+                return Object.keys(obj).reduce((acc, k) => {
+                    const pre = prefix ? prefix + '.' : '';
+                    if (obj[k] && typeof obj[k] === 'object' && !Array.isArray(obj[k])) {
+                        Object.assign(acc, flattenObject(obj[k], pre + k));
+                    } else { acc[pre + k] = obj[k]; }
+                    return acc;
+                }, {});
+            }
+            
+            function formatCsvCell(value) {
+                const strValue = String(value);
+                if (/[",\n]/.test(strValue)) return `"${strValue.replace(/"/g, '""')}"`;
+                return strValue;
+            }
+
+            function updateStatus(message, isError) {
+                statusMessage.textContent = message;
+                statusMessage.className = isError ? 'error' : 'success';
+            }
+            
+            // --- TAB SWITCHING ---
+            document.querySelectorAll('.tab-link').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-link, .tab-content').forEach(el => el.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab).classList.add('active');
+                });
+            });
+
+            // --- UTILITY FUNCTIONS ---
+            async function copyText(text, button, defaultText = 'Copy') {
+                if (!text) return;
+                let success = false;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    success = true;
+                } catch (err) {
+                    const ta = document.createElement("textarea");
+                    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = 0;
+                    document.body.appendChild(ta); ta.select();
+                    try { success = document.execCommand('copy'); } catch (e) {}
+                    document.body.removeChild(ta);
+                }
+                button.textContent = success ? 'Copied!' : 'Failed!';
+                setTimeout(() => { button.textContent = defaultText; }, 2000);
+            }
+
+            function downloadFile(content, fileName, mimeType) {
+                if (!content) return;
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName;
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a); URL.revokeObjectURL(url);
+            }
+            
+            processInput(); // Initial process on load
+        });
+    </script>
+</body>
+</html>
